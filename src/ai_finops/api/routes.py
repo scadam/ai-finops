@@ -340,8 +340,8 @@ def acknowledge_anomaly(
     repo: Repository = Depends(_repo),
 ) -> dict[str, Any]:
     action = str(body.get("action", ""))
-    by = str(body.get("by", ""))
-    row = repo.acknowledge_anomaly(anomaly_id, action=action, by=by)
+    acknowledged_by = str(body.get("by", ""))
+    row = repo.acknowledge_anomaly(anomaly_id, action=action, by=acknowledged_by)
     if row is None:
         raise HTTPException(status_code=404, detail=f"Anomaly {anomaly_id} not found")
     return row

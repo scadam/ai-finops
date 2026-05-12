@@ -12,7 +12,6 @@ and persists everything via the Repository.
 from __future__ import annotations
 
 import argparse
-import calendar
 import logging
 import random
 import sys
@@ -41,7 +40,8 @@ RNG = random.Random(7)
 
 def _agent_profiles() -> list[AgentProfile]:
     """Hand-curated 9 agents covering all AgentType variants."""
-    base_owner = lambda name: f"{name}@fabrikam.com"  # noqa: E731
+    def base_owner(name: str) -> str:
+        return f"{name}@fabrikam.com"
     return [
         AgentProfile(
             agent_id="agt-hr-policy",
@@ -398,8 +398,6 @@ def _seed(repo: Repository, rates: RateCardService) -> None:
     repo.replace_anomalies(anomalies)
     print(f"Seeded {len(profiles)} agents, {len(all_events)} cost events, "
           f"{len(anomalies)} anomalies.", flush=True)
-    # Suppress unused warning from calendar import; calendar used by AnomalyDetector
-    _ = calendar
 
 
 def _reset_sqlite(url: str) -> None:
