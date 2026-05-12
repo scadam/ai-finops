@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api import router
 from .config import get_settings
+from .db import Repository, get_session_factory, init_db
 from .modeler.scenario_comparison import ScenarioComparison
 from .optimisation.recommender import OptimisationRecommender
 from .services.cost_calculator import CostCalculator
@@ -49,11 +50,15 @@ def create_app() -> FastAPI:
     scenario_comparison = ScenarioComparison(cost_calculator)
     optimisation_recommender = OptimisationRecommender(rate_card_service)
 
+    init_db(settings.database_url)
+    repository = Repository(get_session_factory(settings.database_url))
+
     app.state.settings = settings
     app.state.rate_card_service = rate_card_service
     app.state.cost_calculator = cost_calculator
     app.state.scenario_comparison = scenario_comparison
     app.state.optimisation_recommender = optimisation_recommender
+    app.state.repository = repository
 
     app.include_router(router)
 

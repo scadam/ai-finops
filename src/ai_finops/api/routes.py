@@ -1,18 +1,21 @@
 """HTTP routes for the AI FinOps backend.
 
-Implements the endpoints listed in copilot-instructions.md §7. Endpoints
-that depend on persistent storage (cost ledger, anomalies, budgets) are
-implemented as in-memory stubs that return well-formed empty payloads —
-hook them up to Azure SQL once the database layer is in place.
+Implements the endpoints listed in copilot-instructions.md §7. Most cost,
+agent, optimisation and governance endpoints query the SQLAlchemy
+``Repository`` exposed via ``app.state.repository``.
 """
 from __future__ import annotations
 
+import csv
+import io
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 
+from ..db import Repository
 from ..domain.models import (
     AgentProfile,
     CostBreakdown,
@@ -25,6 +28,7 @@ from ..services.cost_calculator import CostCalculator
 from ..services.rate_card_service import RateCardService
 from .schemas import (
     AgentProfileIn,
+    BudgetIn,
     CompareRequest,
     CompareResponse,
     CostBreakdownOut,
@@ -34,6 +38,7 @@ from .schemas import (
     OptimisationOut,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1")
 
 
@@ -54,6 +59,10 @@ def _scenarios(request: Request) -> ScenarioComparison:
 
 def _recommender(request: Request) -> OptimisationRecommender:
     return request.app.state.optimisation_recommender
+
+
+def _repo(request: Request) -> Repository:
+    return request.app.state.repository
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +127,19 @@ def _breakdown_to_out(b: CostBreakdown) -> CostBreakdownOut:
     )
 
 
+def _rate_card_status(rates: RateCardService) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": s["name"],
+            "last_refreshed": s["loaded_at"],
+            "is_stale": s["is_stale"],
+            "effective_date": s["effective_date"],
+            "source_url": s.get("source_path", ""),
+        }
+        for s in rates.status()
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Health + rate cards
 # ---------------------------------------------------------------------------
@@ -125,7 +147,10 @@ def _breakdown_to_out(b: CostBreakdown) -> CostBreakdownOut:
 def health(request: Request) -> HealthResponse:
     rates = _rates(request)
     from ..config import get_settings
-    return HealthResponse(status="ok", env=get_settings().env, rate_cards=rates.status())
+
+    return HealthResponse(
+        status="ok", env=get_settings().env, rate_cards=_rate_card_status(rates)
+    )
 
 
 @router.get("/rate-cards", tags=["rate-cards"])
@@ -143,13 +168,13 @@ def get_rate_cards(rates: RateCardService = Depends(_rates)) -> dict[str, Any]:
 
 @router.get("/rate-cards/refresh-status", tags=["rate-cards"])
 def rate_cards_refresh_status(rates: RateCardService = Depends(_rates)) -> list[dict[str, Any]]:
-    return rates.status()
+    return _rate_card_status(rates)
 
 
 @router.post("/rate-cards/reload", tags=["rate-cards"])
 def rate_cards_reload(rates: RateCardService = Depends(_rates)) -> dict[str, Any]:
     rates.load()
-    return {"status": "reloaded", "cards": rates.status()}
+    return {"status": "reloaded", "cards": _rate_card_status(rates)}
 
 
 # ---------------------------------------------------------------------------
@@ -195,70 +220,189 @@ def scenarios_compare(
 
 
 # ---------------------------------------------------------------------------
-# Cost ledger / agents / optimisations / governance — stub responses.
-# Hook these to Azure SQL queries in a future iteration.
+# Agents
 # ---------------------------------------------------------------------------
 @router.get("/agents", tags=["agents"])
-def list_agents() -> list[dict[str, Any]]:
-    return []
+def list_agents(
+    environment: str | None = None,
+    cost_center: str | None = None,
+    agent_type: str | None = None,
+    repo: Repository = Depends(_repo),
+) -> list[dict[str, Any]]:
+    return repo.list_agents(environment=environment, cost_center=cost_center, agent_type=agent_type)
 
 
 @router.get("/agents/{agent_id}", tags=["agents"])
-def get_agent(agent_id: str) -> dict[str, Any]:
-    raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found (no DB in this build)")
+def get_agent(agent_id: str, repo: Repository = Depends(_repo)) -> dict[str, Any]:
+    row = repo.get_agent(agent_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+    return row
 
 
+# ---------------------------------------------------------------------------
+# Cost ledger / summary / trends
+# ---------------------------------------------------------------------------
 @router.get("/cost/ledger", tags=["cost"])
-def cost_ledger(limit: int = 100, offset: int = 0) -> dict[str, Any]:
-    return {"items": [], "limit": limit, "offset": offset, "total": 0}
+def cost_ledger(
+    limit: int = 100,
+    offset: int = 0,
+    meter: str | None = None,
+    agent_id: str | None = None,
+    cost_center: str | None = None,
+    repo: Repository = Depends(_repo),
+) -> dict[str, Any]:
+    return repo.list_cost_events(
+        limit=limit, offset=offset, meter=meter, agent_id=agent_id, cost_center=cost_center
+    )
 
 
 @router.get("/cost/summary", tags=["cost"])
-def cost_summary() -> dict[str, Any]:
-    return {"by_meter": {"per_seat": "0", "copilot_credits": "0", "azure_consumption": "0"}}
+def cost_summary(repo: Repository = Depends(_repo)) -> dict[str, Any]:
+    return repo.cost_summary()
 
 
 @router.get("/cost/trends", tags=["cost"])
-def cost_trends() -> dict[str, Any]:
-    return {"series": []}
+def cost_trends(months: int = 6, repo: Repository = Depends(_repo)) -> list[dict[str, Any]]:
+    return repo.cost_trends(months=months)
 
 
+# ---------------------------------------------------------------------------
+# Optimisations
+# ---------------------------------------------------------------------------
 @router.get("/optimisations", tags=["optimisations"])
-def list_optimisations() -> list[dict[str, Any]]:
-    return []
+def list_optimisations(
+    category: str | None = None,
+    effort: str | None = None,
+    min_saving: float | None = None,
+    include_dismissed: bool = False,
+    repo: Repository = Depends(_repo),
+) -> list[dict[str, Any]]:
+    return repo.list_optimisations(
+        category=category,
+        effort=effort,
+        min_saving=Decimal(str(min_saving)) if min_saving is not None else None,
+        include_dismissed=include_dismissed,
+    )
 
 
+@router.post("/optimisations/{opt_id}/dismiss", tags=["optimisations"])
+def dismiss_optimisation(
+    opt_id: str,
+    body: dict[str, Any] = Body(default_factory=dict),
+    repo: Repository = Depends(_repo),
+) -> dict[str, Any]:
+    reason = str(body.get("reason", ""))
+    row = repo.dismiss_optimisation(opt_id, reason)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Optimisation {opt_id} not found")
+    return row
+
+
+# ---------------------------------------------------------------------------
+# Governance — licenses / credits / budgets / anomalies
+# ---------------------------------------------------------------------------
 @router.get("/licenses", tags=["governance"])
-def licenses_summary() -> dict[str, Any]:
-    return {"assigned": 0, "active_7d": 0, "active_30d": 0, "shadow_credits": 0}
+def licenses_summary(repo: Repository = Depends(_repo)) -> list[dict[str, Any]]:
+    return repo.license_summary()
 
 
 @router.get("/credits", tags=["governance"])
-def credits_summary() -> dict[str, Any]:
-    return {"by_agent": [], "total_charged": 0, "total_shadow": 0}
+def credits_summary(repo: Repository = Depends(_repo)) -> dict[str, Any]:
+    return repo.credit_usage()
 
 
 @router.get("/budgets", tags=["governance"])
-def list_budgets() -> list[dict[str, Any]]:
-    return []
+def list_budgets(repo: Repository = Depends(_repo)) -> list[dict[str, Any]]:
+    return repo.list_budgets()
+
+
+@router.post("/budgets", tags=["governance"])
+def create_budget(
+    payload: BudgetIn, repo: Repository = Depends(_repo)
+) -> dict[str, Any]:
+    return repo.create_budget(**payload.model_dump())
 
 
 @router.get("/anomalies", tags=["governance"])
-def list_anomalies() -> list[dict[str, Any]]:
-    return []
+def list_anomalies(
+    severity: str | None = None,
+    acknowledged: bool | None = None,
+    repo: Repository = Depends(_repo),
+) -> list[dict[str, Any]]:
+    return repo.list_anomalies(severity=severity, acknowledged=acknowledged)
 
 
+@router.post("/anomalies/{anomaly_id}/acknowledge", tags=["governance"])
+def acknowledge_anomaly(
+    anomaly_id: str,
+    body: dict[str, Any] = Body(default_factory=dict),
+    repo: Repository = Depends(_repo),
+) -> dict[str, Any]:
+    action = str(body.get("action", ""))
+    by = str(body.get("by", ""))
+    row = repo.acknowledge_anomaly(anomaly_id, action=action, by=by)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Anomaly {anomaly_id} not found")
+    return row
+
+
+# ---------------------------------------------------------------------------
+# Reports
+# ---------------------------------------------------------------------------
 @router.get("/reports/executive-summary", tags=["reports"])
-def executive_summary() -> dict[str, Any]:
+def executive_summary(repo: Repository = Depends(_repo)) -> dict[str, Any]:
+    summary = repo.cost_summary()
+    top_optimisations = repo.list_optimisations()[:3]
     return {
         "generated_at": datetime.now(UTC).isoformat(),
-        "total_ai_spend_usd": "0",
-        "by_meter": {},
-        "top_agents": [],
-        "top_optimisations": [],
+        "total_ai_spend_usd": summary.get("total_monthly_usd", "0"),
+        "by_meter": summary.get("by_meter", {}),
+        "top_optimisations": top_optimisations,
+        "summary": summary,
     }
 
 
+FOCUS_COLUMNS = [
+    "BillingPeriodStart",
+    "ChargePeriodStart",
+    "BilledCost",
+    "EffectiveCost",
+    "ServiceName",
+    "ServiceCategory",
+    "ResourceId",
+    "ResourceName",
+    "ResourceType",
+    "Tags.AgentId",
+    "Tags.CostCenter",
+    "Tags.Owner",
+    "Tags.Environment",
+    "UsageQuantity",
+    "UsageUnit",
+]
+
+
 @router.get("/reports/focus-export", tags=["reports"])
-def focus_export() -> dict[str, Any]:
-    return {"format": "FOCUS 1.1", "rows": []}
+def focus_export(
+    download: bool = False,
+    repo: Repository = Depends(_repo),
+):
+    rows = repo.focus_rows()
+    if not download:
+        return {
+            "format": "FOCUS 1.1",
+            "row_count": len(rows),
+            "columns": FOCUS_COLUMNS,
+        }
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=FOCUS_COLUMNS)
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({c: r.get(c, "") for c in FOCUS_COLUMNS})
+    csv_bytes = buf.getvalue().encode("utf-8")
+    filename = f"focus-export-{datetime.now(UTC).strftime('%Y%m%d')}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
