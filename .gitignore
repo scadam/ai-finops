@@ -223,3 +223,8 @@ infra/main.parameters.local.json
 node_modules/
 dist-frontend/
 .azure/
+
+# Local sqlite database files
+.data/
+*.sqlite
+*.sqlite-journal
