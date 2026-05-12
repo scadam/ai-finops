@@ -1,0 +1,96 @@
+# Azure OpenAI rate card
+# Source: https://azure.microsoft.com/en-us/pricing/details/azure-openai/
+effective_date: "2026-05-12"
+source_url: "https://azure.microsoft.com/en-us/pricing/details/azure-openai/"
+currency: USD
+unit: per_1m_tokens
+
+models:
+  gpt_5_4:
+    display_name: "GPT-5.4"
+    context_window_k: 128
+    input_per_1m: 2.50
+    cached_input_per_1m: 0.25
+    output_per_1m: 15.00
+    batch_discount: 0.50
+
+  gpt_5_4_long:
+    display_name: "GPT-5.4 (>272k context)"
+    context_window_k: 1024
+    input_per_1m: 5.00
+    cached_input_per_1m: 0.50
+    output_per_1m: 22.50
+    batch_discount: 0.50
+
+  gpt_5_4_pro:
+    display_name: "GPT-5.4 Pro"
+    context_window_k: 272
+    input_per_1m: 30.00
+    output_per_1m: 180.00
+    note: "Frontier model — verify GA pricing before building cost models"
+
+  gpt_5_4_mini:
+    display_name: "GPT-5.4 mini"
+    input_per_1m: 0.75
+    cached_input_per_1m: 0.08
+    output_per_1m: 4.50
+    batch_discount: 0.50
+
+  gpt_5_4_nano:
+    display_name: "GPT-5.4 nano"
+    input_per_1m: 0.20
+    cached_input_per_1m: 0.02
+    output_per_1m: 1.25
+    batch_discount: 0.50
+
+  gpt_4o:
+    display_name: "GPT-4o"
+    input_per_1m: 2.50
+    output_per_1m: 10.00
+    batch_discount: 0.50
+    ptu_per_hour: 40.00
+    ptu_break_even_tokens_per_month: 2000000000
+
+  gpt_4o_mini:
+    display_name: "GPT-4o mini"
+    input_per_1m: 0.15
+    output_per_1m: 0.60
+    batch_discount: 0.50
+    ptu_per_hour: 10.00
+
+  gpt_4_1:
+    display_name: "GPT-4.1"
+    input_per_1m: 2.00
+    output_per_1m: 8.00
+    batch_discount: 0.50
+    ptu_per_hour: 80.00
+
+  gpt_4_1_mini:
+    display_name: "GPT-4.1 mini"
+    input_per_1m: 0.40
+    output_per_1m: 1.60
+    batch_discount: 0.50
+
+  gpt_4_turbo:
+    display_name: "GPT-4 Turbo"
+    input_per_1m: 10.00
+    output_per_1m: 30.00
+    ptu_per_hour: 100.00
+
+prompt_caching:
+  discount_multiplier: 0.10    # cached input = 10% of full input price
+  note: "Supported on GPT-5.4, GPT-5.4 mini/nano, GPT-4.1 family"
+  supported_models:
+    - gpt_5_4
+    - gpt_5_4_long
+    - gpt_5_4_mini
+    - gpt_5_4_nano
+    - gpt_4_1
+    - gpt_4_1_mini
+
+ptu:
+  min_commitment_units: 100
+  reservation_discounts:
+    one_month: 0.30
+    one_year: 0.50
+  compute_hour_per_month: 730

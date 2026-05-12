@@ -1,0 +1,12 @@
+# Cost-split rules for shared workloads.
+# Each rule attributes one resource_id to multiple cost centres.
+#
+# Schema (per rule):
+#   resource_id: Azure resource id, agent id, or model deployment id
+#   split_key: proportional_invocations | proportional_tokens | equal | manual
+#   allocations:
+#     - cost_center: "<name>"
+#       weight: <float, normalised across allocations>
+#
+# Empty by default — populate per tenant.
+rules: []

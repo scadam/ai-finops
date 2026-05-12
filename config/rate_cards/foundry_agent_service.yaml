@@ -1,0 +1,23 @@
+# Azure AI Foundry Agent Service rate card
+# Source: https://azure.microsoft.com/en-us/pricing/details/foundry-agent-service/
+effective_date: "2026-05-12"
+source_url: "https://azure.microsoft.com/en-us/pricing/details/foundry-agent-service/"
+
+native_agents:
+  runtime_cost: 0.00
+  note: "No charge for creating or running Foundry-native agents; pay for tokens + tools only"
+
+hosted_agents:
+  vcpu_per_hour: 0.0994
+  memory_gib_per_hour: 0.0118
+  note: "Customer-dedicated containers; Microsoft Agent Framework, LangGraph etc."
+
+tools:
+  file_search_storage_per_gb_day: 0.11
+  file_search_free_gb: 1
+  code_interpreter_per_session: 0.033
+  web_search_per_1k_transactions: 14.00
+  custom_search_per_1k_transactions: 14.00
+
+foundry_iq_connections:
+  note: "Logic Apps connectors, Microsoft Fabric, SharePoint, Bing Grounding — billed separately per their own rate cards"

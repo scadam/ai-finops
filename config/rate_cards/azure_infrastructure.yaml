@@ -1,0 +1,28 @@
+# Supporting Azure infrastructure rate card for AI agent workloads
+effective_date: "2026-05-12"
+source_url: "https://azure.microsoft.com/en-us/pricing/"
+
+azure_functions:
+  consumption_per_1m_executions: 0.20
+  memory_gb_s: 0.000016
+  free_executions_per_month: 1000000
+
+logic_apps:
+  consumption_per_action: 0.000025
+  note: "1400+ connectors; major hidden cost at scale — alert when monthly actions exceed 1M"
+
+storage:
+  hot_per_gb_month: 0.018
+  cool_per_gb_month: 0.01
+  archive_per_gb_month: 0.001
+  lifecycle_policy_note: "Apply auto-tiering for conversation history older than 30 days"
+
+application_insights:
+  log_analytics_per_gb: 2.30
+  note: "Add 5-10% to AI workload cost; tag all telemetry with AgentId"
+
+fine_tuned_models:
+  deployed_idle_monthly_low: 1836.00
+  deployed_idle_monthly_high: 2160.00
+  anomaly_threshold_days_idle: 7
+  note: "ZOMBIE alert: fine-tuned model deployed >7 days with <1 invocation/day"
