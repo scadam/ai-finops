@@ -1,0 +1,2 @@
+# ai-finops
+AI FinOps
