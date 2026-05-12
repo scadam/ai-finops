@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --fabric-blue: #0078d4;
+  --fabric-blue-dark: #106ebe;
+  --fabric-blue-light: #deecf9;
+  --fabric-gray-10: #faf9f8;
+  --fabric-gray-20: #f3f2f1;
+  --fabric-gray-30: #edebe9;
+  --fabric-gray-130: #605e5c;
+  --fabric-gray-160: #323130;
+  --fabric-gray-190: #201f1e;
+  --fabric-success: #107c10;
+  --fabric-warning: #ffaa44;
+  --fabric-error: #d13438;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv01";
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--fabric-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Recharts tooltip polish */
+.recharts-default-tooltip {
+  border-radius: 6px !important;
+  border: 1px solid var(--fabric-gray-30) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+  font-size: 12px !important;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fabric-gray-30);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fabric-gray-130);
+}
