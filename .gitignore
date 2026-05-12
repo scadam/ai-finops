@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific
+deploy.log
+infra/main.parameters.local.json
+node_modules/
+dist-frontend/
+.azure/

@@ -1,0 +1,74 @@
+# Per-seat license rate card
+# All prices USD per user per month, annual commitment, as of effective_date
+# Source: https://www.microsoft.com/en-us/microsoft-365-copilot/pricing
+effective_date: "2026-05-12"
+source_url: "https://www.microsoft.com/en-us/microsoft-365-copilot/pricing"
+
+skus:
+  m365_copilot_addon:
+    name: "Microsoft 365 Copilot (add-on)"
+    price_usd: 30.00
+    billing_period: monthly
+    annual_commit: true
+    base_license_required: true          # requires E3/E5/Business Standard/Premium
+    grants_b2e_zero_rating: true
+    grants_studio_maker_rights: true
+
+  agent_365:
+    name: "Agent 365"
+    price_usd: 15.00
+    billing_period: monthly
+    annual_commit: true
+    ga_date: "2026-05-01"
+    note: "Governance control plane only. Does NOT include agent build/run cost."
+    grants_b2e_zero_rating: false
+
+  m365_e7_frontier:
+    name: "Microsoft 365 E7 Frontier Suite"
+    price_usd: 99.00
+    billing_period: monthly
+    annual_commit: true
+    ga_date: "2026-05-01"
+    includes: ["e5_base", "m365_copilot_addon", "entra_suite", "agent_365"]
+    grants_b2e_zero_rating: true
+    grants_studio_maker_rights: true
+
+  m365_copilot_chat:
+    name: "Microsoft 365 Copilot Chat"
+    price_usd: 0.00
+    billing_period: monthly
+    note: "Free with eligible M365 subscription. Unlicensed users hit Copilot Credits meter."
+    grants_b2e_zero_rating: false
+
+  m365_e3:
+    name: "Microsoft 365 E3"
+    price_usd: 36.00
+    billing_period: monthly
+    annual_commit: true
+    note: "Rises to $39 on 2026-07-01 per Microsoft Dec 2025 announcement — single-source, flag as moderate confidence"
+    price_usd_post_july_2026: 39.00
+
+  m365_e5:
+    name: "Microsoft 365 E5"
+    price_usd: 57.00
+    billing_period: monthly
+    annual_commit: true
+    price_usd_post_july_2026: 60.00
+
+  m365_business_standard:
+    name: "Microsoft 365 Business Standard"
+    price_usd: 12.50
+    billing_period: monthly
+    annual_commit: true
+
+  m365_business_premium:
+    name: "Microsoft 365 Business Premium"
+    price_usd: 22.00
+    billing_period: monthly
+    annual_commit: true
+
+base_license_options:
+  - m365_e3
+  - m365_e5
+  - m365_business_standard
+  - m365_business_premium

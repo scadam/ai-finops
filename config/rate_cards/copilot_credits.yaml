@@ -1,0 +1,103 @@
+# Copilot Credits rate card
+# Source: https://learn.microsoft.com/en-us/microsoft-copilot-studio/requirements-messages-management
+# Source: https://learn.microsoft.com/en-us/microsoft-copilot-studio/billing-licensing
+effective_date: "2026-05-12"
+source_url: "https://learn.microsoft.com/en-us/microsoft-copilot-studio/billing-licensing"
+
+pricing:
+  payg_per_credit_usd: 0.01
+  prepaid_pack:
+    price_usd: 200.00
+    credits: 25000
+    per_credit_effective: 0.008
+    billing: monthly_tenant_level
+    rollover: false
+
+  pre_purchase_plan_cccu:
+    usd_per_cccu: 1.00
+    credits_per_cccu: 100
+    commitment: annual
+    note: "Volume-tiered discounts available; contact Microsoft for tiers"
+
+consumption_rates:
+  # All rates in Copilot Credits per event
+  # B2E zero-rating: ALL these = 0 when (user has M365 Copilot AND M365 channel)
+  classic_answer:
+    credits: 1
+    description: "Static authored response from a topic"
+    b2e_zero_rated: true
+    unit: per_response
+
+  generative_answer:
+    credits: 2
+    description: "LLM-generated response"
+    b2e_zero_rated: true
+    unit: per_response
+
+  agent_action:
+    credits: 5
+    description: "Trigger, deep-reasoning, topic-transition, Computer-Use action"
+    b2e_zero_rated: true
+    note: "Stacks with base answer credits; does NOT replace them"
+    unit: per_action
+
+  tenant_graph_grounding:
+    credits: 10
+    description: "Per RAG event over tenant Graph (SharePoint, OneDrive, Graph connectors)"
+    b2e_zero_rated: true
+    unit: per_message
+
+  agent_flow_actions:
+    credits: 13
+    description: "Per 100 Power Automate flow actions triggered by agent"
+    b2e_zero_rated: true
+    unit: per_100_actions
+
+  ai_tools_basic:
+    credits: 1
+    description: "Lightweight prompt tools"
+    b2e_zero_rated: true
+    unit: per_10_responses
+
+  ai_tools_standard:
+    credits: 15
+    description: "Standard model tools"
+    b2e_zero_rated: true
+    unit: per_10_responses
+
+  ai_tools_premium:
+    credits: 100
+    description: "Reasoning-model surcharge — STACKS with base answer credits, does not replace"
+    b2e_zero_rated: true
+    unit: per_10_responses
+    stacks_with: ["generative_answer", "agent_action"]
+
+  content_processing:
+    credits: 8
+    description: "Document/image extraction per page"
+    b2e_zero_rated: true
+    unit: per_page
+
+pack_strategy:
+  recommendation_threshold_credits_per_month: 25000
+  note: "Always stack PAYG as overflow when pack is active to prevent agent shutdown"
+
+b2e_zero_rating:
+  eligible_channels: ["m365_copilot", "teams_copilot_extension"]
+  eligible_agent_types:
+    - declarative_instruction
+    - declarative_public
+    - declarative_tenant
+    - copilot_studio_custom
+    - copilot_studio_declarative
+  requires: "user.has_m365_copilot_license == true"
+  note: "Shadow credits must still be recorded for utilisation reporting"
+  fair_use_credits_per_user_per_month: null   # unlimited until Microsoft publishes a threshold
+
+declarative_free_tier:
+  # Instruction-only or public-web-only declarative agents cost $0 for ALL users
+  eligible_agent_types:
+    - declarative_instruction
+    - declarative_public
+  all_users_free: true
+  trigger: "No tenant-data grounding (no SharePoint/OneDrive/Graph connectors)"

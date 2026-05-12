@@ -1,0 +1,35 @@
+# Azure AI Search rate card
+# Source: https://azure.microsoft.com/en-us/pricing/details/search/
+effective_date: "2026-05-12"
+source_url: "https://azure.microsoft.com/en-us/pricing/details/search/"
+
+tiers:
+  free:
+    monthly_per_su: 0.00
+    storage_gb: 0.05
+    max_indexes: 3
+  basic:
+    monthly_per_su: 73.73
+    storage_gb: 15
+  s1:
+    monthly_per_su: 245.28
+    storage_gb: 160
+  s2:
+    monthly_per_su: 981.12
+    storage_gb: 512
+  s3:
+    monthly_per_su: 1962.24
+    storage_gb: 1024
+  l1:
+    monthly_per_su: 2802.47
+    storage_gb: 2048
+  l2:
+    monthly_per_su: 5604.21
+    storage_gb: 4096
+
+addons:
+  semantic_ranker_progressive: true   # progressive pricing; see Microsoft estimator
+  agentic_retrieval_per_1m_tokens: 0.022
+  agentic_retrieval_free_tokens: 50000000
+
+note: "Always-on fixed monthly; scale tiers are 4x cost steps — use Microsoft capacity estimator before scaling"
