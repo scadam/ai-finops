@@ -1,0 +1,149 @@
+# =====================================================================
+# AI FinOps modeller — decision matrix.
+# Owned and overridable per tenant. Every cell carries a rationale_id that
+# the modeller surfaces as a clickable chip in the UI; rationale text is
+# kept inline so the artefact is fully self-describing for audit.
+#
+# Lookup key:  data_sensitivity x audience x must_ground_on x tools_required
+# Value:       recommended { agent_type, channel, model_tier, build_platform }
+# =====================================================================
+version: 2026-01
+
+rationales:
+  R-LRN-001:
+    source: "Microsoft Learn — Choose your Copilot, 2025-Q1, §Declarative agents"
+    text: "Declarative tenant-grounded agent is the lowest-cost option whenever
+           grounding is restricted to internal SharePoint/Graph and external
+           tools are not required. PAYG credit pricing wins below 5k DAU."
+  R-LRN-002:
+    source: "Microsoft Learn — Build Copilot Studio agents, 2025-Q1"
+    text: "Copilot Studio Custom is the right fit when external HTTP tools or
+           Power Automate flows are required and audience is internal."
+  R-LRN-003:
+    source: "Microsoft Learn — Foundry Agent Service overview, 2024-12"
+    text: "Foundry Native is required for customer-facing channels with custom
+           code and explicit model choice (e.g. reasoning models, fine-tunes)."
+  R-LRN-004:
+    source: "Microsoft Purview — Sensitivity-label inheritance, 2025-Q1"
+    text: "When data sensitivity is 'restricted', external chat models are
+           disallowed by default; agent must run inside the tenant boundary."
+  R-LRN-005:
+    source: "Microsoft Learn — Hybrid agents (Studio + Foundry), 2025-Q1"
+    text: "Hybrid Studio + Foundry pattern allows business-user authoring with
+           a Foundry-hosted model when latency target ≤ 1 s and tools include
+           write-backs."
+
+# ---------------------------------------------------------------------
+# Cells. The seeder picks the FIRST matching cell (top-down order).
+# Wildcards: '*' matches any value. Lists match if any element overlaps.
+# ---------------------------------------------------------------------
+cells:
+  - when:
+      data_sensitivity: restricted
+      audience: customers
+    then:
+      agent_type: foundry_native
+      channel: web_chat
+      model_tier: standard
+      build_platform: foundry_agent_service
+      rationale_id: R-LRN-004
+
+  - when:
+      data_sensitivity: [restricted, confidential]
+      audience: employees
+      tools_required: [write_back, workflow_trigger]
+    then:
+      agent_type: hybrid_studio_foundry
+      channel: m365_copilot
+      model_tier: standard
+      build_platform: copilot_studio
+      rationale_id: R-LRN-005
+
+  - when:
+      audience: customers
+      must_ground_on: [web, custom_api]
+    then:
+      agent_type: foundry_native
+      channel: web_chat
+      model_tier: standard
+      build_platform: foundry_agent_service
+      rationale_id: R-LRN-003
+
+  - when:
+      audience: employees
+      tools_required: [write_back, workflow_trigger]
+    then:
+      agent_type: copilot_studio_custom
+      channel: m365_copilot
+      model_tier: economy
+      build_platform: copilot_studio
+      rationale_id: R-LRN-002
+
+  - when:
+      audience: employees
+      must_ground_on: [sharepoint, dataverse, graph]
+      tools_required: [lookup]
+    then:
+      agent_type: declarative_tenant
+      channel: m365_copilot
+      model_tier: economy
+      build_platform: agents_toolkit
+      rationale_id: R-LRN-001
+
+  # Catch-all default — declarative public-grounded agent on M365 Copilot.
+  - when:
+      audience: "*"
+    then:
+      agent_type: declarative_public
+      channel: m365_copilot
+      model_tier: economy
+      build_platform: agents_toolkit
+      rationale_id: R-LRN-001
+
+# ---------------------------------------------------------------------
+# Capability lookup — used by the decision engine's `fit` score.
+# ---------------------------------------------------------------------
+capabilities:
+  declarative_public:
+    must_ground_on: [web]
+    tools_required: []
+  declarative_tenant:
+    must_ground_on: [sharepoint, dataverse, graph]
+    tools_required: [lookup]
+  declarative_instruction:
+    must_ground_on: [sharepoint, graph]
+    tools_required: [lookup]
+  copilot_studio_custom:
+    must_ground_on: [sharepoint, dataverse, graph, custom_api]
+    tools_required: [lookup, write_back, workflow_trigger]
+  foundry_native:
+    must_ground_on: [sharepoint, dataverse, graph, custom_api, web]
+    tools_required: [lookup, write_back, workflow_trigger]
+  foundry_hosted:
+    must_ground_on: [sharepoint, dataverse, graph, custom_api, web]
+    tools_required: [lookup, write_back, workflow_trigger]
+  hybrid_studio_foundry:
+    must_ground_on: [sharepoint, dataverse, graph, custom_api, web]
+    tools_required: [lookup, write_back, workflow_trigger]
+
+# ---------------------------------------------------------------------
+# Channel availability gate — only seed channels the tenant has.
+# Mapping is { channel -> required_sku_token }.
+# ---------------------------------------------------------------------
+channel_requires_sku:
+  m365_copilot: copilot
+  teams_copilot_extension: copilot
+  web_chat: ""           # no SKU required
+  custom_channel: ""
+
+# ---------------------------------------------------------------------
+# Compliance: which sensitivity labels each agent technology can carry.
+# ---------------------------------------------------------------------
+compliance_sensitivity:
+  declarative_public: [public, internal]
+  declarative_tenant: [public, internal, confidential]
+  declarative_instruction: [public, internal, confidential]
+  copilot_studio_custom: [public, internal, confidential]
+  foundry_native: [public, internal, confidential, restricted]
+  foundry_hosted: [public, internal, confidential, restricted]
+  hybrid_studio_foundry: [public, internal, confidential, restricted]
