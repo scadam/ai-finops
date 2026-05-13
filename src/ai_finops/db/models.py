@@ -178,3 +178,170 @@ class UntaggedSpendRow(Base):
     cost_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
     missing_tags: Mapped[str] = mapped_column(String(512), default="")
     billing_period: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+
+# =====================================================================
+# Plug-and-play ingestion: tenant-discovery tables
+# =====================================================================
+class AgentOwnerRow(Base):
+    """Owner identities for an Agent 365 / Entra agent."""
+
+    __tablename__ = "agent_owners"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    agent_id: Mapped[str] = mapped_column(String(128), index=True)
+    owner_upn: Mapped[str] = mapped_column(String(256), default="")
+    owner_object_id: Mapped[str] = mapped_column(String(128), default="")
+    owner_display_name: Mapped[str] = mapped_column(String(256), default="")
+    captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    source_system: Mapped[str] = mapped_column(String(64), default="")
+    raw_record_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
+Index(
+    "ix_agent_owners_agent_object",
+    AgentOwnerRow.agent_id, AgentOwnerRow.owner_object_id, unique=True,
+)
+
+
+class LicensedPopulationRow(Base):
+    """One row per Copilot SKU snapshot — assigned + active counts."""
+
+    __tablename__ = "licensed_population"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sku_id: Mapped[str] = mapped_column(String(64), index=True)
+    sku_part_number: Mapped[str] = mapped_column(String(128), default="")
+    captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    assigned_users: Mapped[int] = mapped_column(Integer, default=0)
+    active_users_30d: Mapped[int] = mapped_column(Integer, default=0)
+    active_pct: Mapped[float] = mapped_column(Numeric(6, 2), default=0)
+    source_system: Mapped[str] = mapped_column(String(64), default="")
+    raw_record_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
+class DataSensitivityLabelRow(Base):
+    """Purview sensitivity-label catalogue snapshot."""
+
+    __tablename__ = "data_sensitivity_labels"
+
+    label_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    display_name: Mapped[str] = mapped_column(String(256), default="")
+    sensitivity: Mapped[str] = mapped_column(String(32), default="internal", index=True)
+    tooltip: Mapped[str] = mapped_column(Text, default="")
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    dlp_policy_count: Mapped[int] = mapped_column(Integer, default=0)
+    classification_count: Mapped[int] = mapped_column(Integer, default=0)
+    source_system: Mapped[str] = mapped_column(String(64), default="")
+    raw_record_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
+class AgentRiskSignalRow(Base):
+    """Defender / Security alert attributed to an agent service principal."""
+
+    __tablename__ = "agent_risk_signals"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    agent_id: Mapped[str] = mapped_column(String(128), default="", index=True)
+    alert_id: Mapped[str] = mapped_column(String(256), default="")
+    title: Mapped[str] = mapped_column(String(256), default="")
+    severity: Mapped[str] = mapped_column(String(16), default="medium", index=True)
+    status: Mapped[str] = mapped_column(String(32), default="newAlert")
+    category: Mapped[str] = mapped_column(String(64), default="")
+    service_source: Mapped[str] = mapped_column(String(64), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    source_system: Mapped[str] = mapped_column(String(64), default="")
+    raw_record_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
+class PowerPlatformEnvironmentRow(Base):
+    """Snapshot of a Power Platform environment."""
+
+    __tablename__ = "power_platform_environments"
+
+    environment_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    display_name: Mapped[str] = mapped_column(String(256), default="")
+    region: Mapped[str] = mapped_column(String(64), default="")
+    sku: Mapped[str] = mapped_column(String(64), default="")
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    credit_pool_total: Mapped[int] = mapped_column(Integer, default=0)
+    credit_pool_consumed: Mapped[int] = mapped_column(Integer, default=0)
+    dlp_policy_count: Mapped[int] = mapped_column(Integer, default=0)
+    source_system: Mapped[str] = mapped_column(String(64), default="")
+    raw_record_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
+class AzureInventoryRow(Base):
+    """Snapshot of Azure resources gathered from ARM."""
+
+    __tablename__ = "azure_inventory"
+
+    resource_id: Mapped[str] = mapped_column(String(512), primary_key=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    name: Mapped[str] = mapped_column(String(256), default="")
+    kind: Mapped[str] = mapped_column(String(64), default="other", index=True)
+    resource_type: Mapped[str] = mapped_column(String(128), default="")
+    location: Mapped[str] = mapped_column(String(64), default="")
+    sku_name: Mapped[str] = mapped_column(String(64), default="")
+    tags: Mapped[str] = mapped_column(String(512), default="")
+    subscription_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    source_system: Mapped[str] = mapped_column(String(64), default="")
+    raw_record_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
+class IngestionRunRow(Base):
+    """Audit table — one row per puller run (for the data-sources health UI)."""
+
+    __tablename__ = "ingestion_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job: Mapped[str] = mapped_column(String(64), index=True)
+    sdk_call: Mapped[str] = mapped_column(String(512), default="")
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rows_in: Mapped[int] = mapped_column(Integer, default=0)
+    rows_written: Mapped[int] = mapped_column(Integer, default=0)
+    untagged_rows: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="ok", index=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+# =====================================================================
+# Modeller — requirement-driven design surface (Part 2)
+# =====================================================================
+class AgentRequirementRow(Base):
+    """A captured business requirement (free-text + structured form)."""
+
+    __tablename__ = "agent_requirements"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    description: Mapped[str] = mapped_column(Text, default="")
+    audience: Mapped[str] = mapped_column(String(32), default="employees")
+    audience_size: Mapped[int] = mapped_column(Integer, default=0)
+    data_sensitivity: Mapped[str] = mapped_column(String(32), default="internal")
+    must_ground_on: Mapped[str] = mapped_column(String(256), default="")          # csv
+    tools_required: Mapped[str] = mapped_column(String(256), default="")          # csv
+    latency_target_ms: Mapped[int] = mapped_column(Integer, default=0)
+    compliance_constraints: Mapped[str] = mapped_column(String(512), default="")  # csv
+    expected_interactions_per_user_per_month: Mapped[int] = mapped_column(Integer, default=20)
+
+
+class ModelerSessionRow(Base):
+    """Persistent state of a modeller session (seed → refine → promote)."""
+
+    __tablename__ = "modeler_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    requirement_id: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    profile_json: Mapped[str] = mapped_column(Text, default="{}")
+    usage_json: Mapped[str] = mapped_column(Text, default="{}")
+    last_score_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    promoted_agent_id: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -1,0 +1,17 @@
+# =====================================================================
+# AI FinOps modeller — decision-engine weights.
+# Tenants override this file to bias the engine; weights must sum to 1.0
+# (the engine validates and renormalises with a logged warning otherwise).
+# =====================================================================
+version: 2026-01
+
+weights:
+  fit:             0.40   # how many requirement axes the candidate satisfies
+  cost_efficiency: 0.30   # 1 / total_monthly_usd, normalised across candidates
+  risk:            0.15   # Defender risk + frontier-preview penalty
+  compliance:     0.15   # Purview-label intersection (boolean)
+
+# Caps used to make sub-scores comparable.
+caps:
+  cost_efficiency_max_usd: 100000   # anything above is treated as worst
+  risk_max_alerts: 5                # >5 high-severity alerts = worst risk

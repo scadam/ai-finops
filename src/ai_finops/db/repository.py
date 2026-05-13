@@ -19,11 +19,20 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from ..domain.enums import Meter
 from .models import (
+    AgentOwnerRow,
+    AgentRequirementRow,
+    AgentRiskSignalRow,
     AgentRow,
     AnomalyRow,
+    AzureInventoryRow,
     BudgetRow,
     CostEventRow,
+    DataSensitivityLabelRow,
+    IngestionRunRow,
+    LicensedPopulationRow,
+    ModelerSessionRow,
     OptimisationRow,
+    PowerPlatformEnvironmentRow,
     UntaggedSpendRow,
 )
 
@@ -102,11 +111,28 @@ class Repository:
     # ------------------------------------------------------------------
     # Cost events
     # ------------------------------------------------------------------
-    def insert_cost_events(self, events: Iterable[Mapping[str, Any]]) -> int:
+    def insert_cost_events(
+        self,
+        events: Iterable[Mapping[str, Any]],
+        *,
+        require_source: bool = True,
+    ) -> int:
+        """Insert cost events.
+
+        ``source_system`` MUST be present and non-empty unless ``require_source``
+        is explicitly disabled (used only by the legacy seed CLI for back-compat).
+        Rejecting unattributed inserts is what implements the spec rule "every
+        cost row traces back to a named SDK call" — see Part 1 §4 of the plan.
+        """
         count = 0
         with self._sf() as s:
             for ev in events:
                 payload = dict(ev)
+                if require_source and not str(payload.get("source_system") or "").strip():
+                    raise ValueError(
+                        "insert_cost_events: source_system is required and must be non-empty. "
+                        "Set require_source=False only for trusted seed/test fixtures."
+                    )
                 payload.setdefault("id", f"ce-{uuid.uuid4().hex[:16]}")
                 # Coerce decimals
                 for f in ("cost_actual_usd", "cost_shadow_usd", "discount_applied_usd"):
@@ -746,6 +772,279 @@ class Repository:
                 .group_by(CostEventRow.agent_id)
             )
             return {r[0]: int(r[1] or 0) for r in s.execute(stmt).all()}
+
+    # ==================================================================
+    # Plug-and-play ingestion: tenant-discovery tables
+    # ==================================================================
+    def upsert_agent_owners(self, rows: Iterable[Mapping[str, Any]]) -> int:
+        count = 0
+        with self._sf() as s:
+            for r in rows:
+                payload = dict(r)
+                if not str(payload.get("source_system") or "").strip():
+                    raise ValueError("upsert_agent_owners: source_system required")
+                agent_id = str(payload.get("agent_id") or "")
+                obj_id = str(payload.get("owner_object_id") or "")
+                if not agent_id:
+                    continue
+                existing = None
+                if obj_id:
+                    existing = s.scalar(
+                        select(AgentOwnerRow).where(
+                            AgentOwnerRow.agent_id == agent_id,
+                            AgentOwnerRow.owner_object_id == obj_id,
+                        )
+                    )
+                if existing:
+                    for k, v in payload.items():
+                        if hasattr(existing, k):
+                            setattr(existing, k, v)
+                    existing.captured_at = _now()
+                else:
+                    payload.setdefault("captured_at", _now())
+                    s.add(AgentOwnerRow(**payload))
+                count += 1
+            s.commit()
+        return count
+
+    def list_agent_owners(self, agent_id: str | None = None) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(AgentOwnerRow)
+            if agent_id:
+                stmt = stmt.where(AgentOwnerRow.agent_id == agent_id)
+            return [_row_to_dict(r) for r in s.scalars(stmt).all()]
+
+    def insert_licensed_population(self, rows: Iterable[Mapping[str, Any]]) -> int:
+        count = 0
+        with self._sf() as s:
+            for r in rows:
+                payload = dict(r)
+                if not str(payload.get("source_system") or "").strip():
+                    raise ValueError("insert_licensed_population: source_system required")
+                payload.setdefault("captured_at", _now())
+                s.add(LicensedPopulationRow(**payload))
+                count += 1
+            s.commit()
+        return count
+
+    def latest_licensed_population(self) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(LicensedPopulationRow).order_by(
+                LicensedPopulationRow.captured_at.desc()
+            )
+            seen: dict[str, dict[str, Any]] = {}
+            for r in s.scalars(stmt).all():
+                if r.sku_id not in seen:
+                    seen[r.sku_id] = _row_to_dict(r)
+            return list(seen.values())
+
+    def upsert_sensitivity_labels(self, rows: Iterable[Mapping[str, Any]]) -> int:
+        count = 0
+        with self._sf() as s:
+            for r in rows:
+                payload = dict(r)
+                if not str(payload.get("source_system") or "").strip():
+                    raise ValueError("upsert_sensitivity_labels: source_system required")
+                label_id = str(payload.get("label_id") or "")
+                if not label_id:
+                    continue
+                row = s.get(DataSensitivityLabelRow, label_id)
+                if row:
+                    for k, v in payload.items():
+                        if hasattr(row, k):
+                            setattr(row, k, v)
+                    row.captured_at = _now()
+                else:
+                    payload.setdefault("captured_at", _now())
+                    s.add(DataSensitivityLabelRow(**payload))
+                count += 1
+            s.commit()
+        return count
+
+    def list_sensitivity_labels(self) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(DataSensitivityLabelRow).order_by(DataSensitivityLabelRow.sensitivity)
+            return [_row_to_dict(r) for r in s.scalars(stmt).all()]
+
+    def insert_risk_signals(self, rows: Iterable[Mapping[str, Any]]) -> int:
+        count = 0
+        with self._sf() as s:
+            for r in rows:
+                payload = dict(r)
+                if not str(payload.get("source_system") or "").strip():
+                    raise ValueError("insert_risk_signals: source_system required")
+                payload.setdefault("id", f"risk-{uuid.uuid4().hex[:16]}")
+                payload.setdefault("captured_at", _now())
+                row = s.get(AgentRiskSignalRow, payload["id"])
+                if row:
+                    for k, v in payload.items():
+                        if hasattr(row, k):
+                            setattr(row, k, v)
+                else:
+                    s.add(AgentRiskSignalRow(**payload))
+                count += 1
+            s.commit()
+        return count
+
+    def list_risk_signals(self, agent_id: str | None = None) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(AgentRiskSignalRow).order_by(AgentRiskSignalRow.captured_at.desc())
+            if agent_id:
+                stmt = stmt.where(AgentRiskSignalRow.agent_id == agent_id)
+            return [_row_to_dict(r) for r in s.scalars(stmt).all()]
+
+    def upsert_power_platform_environments(self, rows: Iterable[Mapping[str, Any]]) -> int:
+        count = 0
+        with self._sf() as s:
+            for r in rows:
+                payload = dict(r)
+                if not str(payload.get("source_system") or "").strip():
+                    raise ValueError("upsert_power_platform_environments: source_system required")
+                env_id = str(payload.get("environment_id") or "")
+                if not env_id:
+                    continue
+                row = s.get(PowerPlatformEnvironmentRow, env_id)
+                if row:
+                    for k, v in payload.items():
+                        if hasattr(row, k):
+                            setattr(row, k, v)
+                    row.captured_at = _now()
+                else:
+                    payload.setdefault("captured_at", _now())
+                    s.add(PowerPlatformEnvironmentRow(**payload))
+                count += 1
+            s.commit()
+        return count
+
+    def list_power_platform_environments(self) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(PowerPlatformEnvironmentRow).order_by(
+                PowerPlatformEnvironmentRow.display_name
+            )
+            return [_row_to_dict(r) for r in s.scalars(stmt).all()]
+
+    def upsert_azure_inventory(self, rows: Iterable[Mapping[str, Any]]) -> int:
+        count = 0
+        with self._sf() as s:
+            for r in rows:
+                payload = dict(r)
+                if not str(payload.get("source_system") or "").strip():
+                    raise ValueError("upsert_azure_inventory: source_system required")
+                rid = str(payload.get("resource_id") or "")
+                if not rid:
+                    continue
+                row = s.get(AzureInventoryRow, rid)
+                if row:
+                    for k, v in payload.items():
+                        if hasattr(row, k):
+                            setattr(row, k, v)
+                    row.captured_at = _now()
+                else:
+                    payload.setdefault("captured_at", _now())
+                    s.add(AzureInventoryRow(**payload))
+                count += 1
+            s.commit()
+        return count
+
+    def list_azure_inventory(self, kind: str | None = None) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(AzureInventoryRow)
+            if kind:
+                stmt = stmt.where(AzureInventoryRow.kind == kind)
+            stmt = stmt.order_by(AzureInventoryRow.kind, AzureInventoryRow.name)
+            return [_row_to_dict(r) for r in s.scalars(stmt).all()]
+
+    # ------------------------------------------------------------------
+    # Ingestion-run audit
+    # ------------------------------------------------------------------
+    def record_ingestion_run(
+        self,
+        job: str,
+        sdk_call: str,
+        rows_in: int,
+        rows_written: int,
+        untagged_rows: int = 0,
+        status: str = "ok",
+        error: str | None = None,
+        finished_at: datetime | None = None,
+    ) -> dict[str, Any]:
+        with self._sf() as s:
+            row = IngestionRunRow(
+                job=job,
+                sdk_call=sdk_call,
+                started_at=_now(),
+                finished_at=finished_at or _now(),
+                rows_in=rows_in,
+                rows_written=rows_written,
+                untagged_rows=untagged_rows,
+                status=status,
+                error=error,
+            )
+            s.add(row)
+            s.commit()
+            s.refresh(row)
+            return _row_to_dict(row)
+
+    def list_ingestion_runs(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = (
+                select(IngestionRunRow)
+                .order_by(IngestionRunRow.started_at.desc())
+                .limit(limit)
+            )
+            return [_row_to_dict(r) for r in s.scalars(stmt).all()]
+
+    def latest_ingestion_per_job(self) -> dict[str, dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(IngestionRunRow).order_by(IngestionRunRow.started_at.desc())
+            seen: dict[str, dict[str, Any]] = {}
+            for r in s.scalars(stmt).all():
+                if r.job not in seen:
+                    seen[r.job] = _row_to_dict(r)
+            return seen
+
+    # ==================================================================
+    # Modeller: requirements + sessions
+    # ==================================================================
+    def create_requirement(self, **fields: Any) -> dict[str, Any]:
+        with self._sf() as s:
+            row = AgentRequirementRow(**fields)
+            s.add(row)
+            s.commit()
+            s.refresh(row)
+            return _row_to_dict(row)
+
+    def get_requirement(self, requirement_id: str) -> dict[str, Any] | None:
+        with self._sf() as s:
+            row = s.get(AgentRequirementRow, requirement_id)
+            return _row_to_dict(row) if row else None
+
+    def list_requirements(self) -> list[dict[str, Any]]:
+        with self._sf() as s:
+            stmt = select(AgentRequirementRow).order_by(AgentRequirementRow.created_at.desc())
+            return [_row_to_dict(r) for r in s.scalars(stmt).all()]
+
+    def upsert_modeler_session(self, **fields: Any) -> dict[str, Any]:
+        sid = fields.get("id")
+        if not sid:
+            raise ValueError("modeler session requires id")
+        with self._sf() as s:
+            row = s.get(ModelerSessionRow, sid)
+            if row:
+                for k, v in fields.items():
+                    if k != "id" and hasattr(row, k):
+                        setattr(row, k, v)
+                row.updated_at = _now()
+            else:
+                s.add(ModelerSessionRow(**fields))
+            s.commit()
+            row = s.get(ModelerSessionRow, sid)
+            return _row_to_dict(row) if row else {}
+
+    def get_modeler_session(self, session_id: str) -> dict[str, Any] | None:
+        with self._sf() as s:
+            row = s.get(ModelerSessionRow, session_id)
+            return _row_to_dict(row) if row else None
 
 
 def _grouped_by_two(items: Iterable[Any], key1: str, key2: str) -> dict[tuple, list]:
