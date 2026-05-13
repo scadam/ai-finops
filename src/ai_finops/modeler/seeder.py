@@ -251,7 +251,9 @@ class TechnologySeeder:
             if req.audience == "employees" and req.data_sensitivity in ("confidential", "restricted"):
                 return req.audience_size
             return 0
-        return min(req.audience_size or facts.copilot_active_users, facts.copilot_active_users)
+        if not req.audience_size:
+            return facts.copilot_active_users
+        return min(req.audience_size, facts.copilot_active_users)
 
 
 # ---------------------------------------------------------------------

@@ -16,8 +16,17 @@ A complete, end-to-end implementation:
   models, idle endpoints, untagged spend, frontier-preview-in-prod, …), budget
   CRUD with on-track/warning/exceeded statuses, and FOCUS 1.1 CSV export.
 * **React 18 + TypeScript SPA** under [`web/`](./web) — Dashboard, Agent Explorer,
-  What-If Modeler, Optimisations, Governance, all built with Tanstack Query +
-  Recharts and themed with Microsoft Fabric design tokens.
+  What-If Modeler, **Agent Modeller** (requirement-driven seeding + decision
+  engine), Optimisations, Governance, all built with Tanstack Query + Recharts
+  and themed with Microsoft Fabric design tokens.
+* **Plug-and-play data collection** — first-party SDK pullers for Agent 365
+  (directory + usage), Entra ID (population + licensing), Microsoft Purview,
+  Defender for Cloud Apps / XDR, Power Platform admin, Azure resource
+  inventory, and Azure Cost Management. One auth factory
+  (`MicrosoftAuthFactory` over `DefaultAzureCredential`) wires Managed
+  Identity in App Service, federated workload identity in CI, and device-code
+  locally. Per-source feature flags live in `.env.example`; the required
+  permissions list is documented in [`docs/permissions.md`](./docs/permissions.md).
 * **Single-click Azure deployment** (`scripts/deploy.sh` + `infra/main.bicep`)
   that provisions every resource in spec §12.
 * **A demo seed CLI** (`python -m ai_finops.seed --reset`) that loads 9

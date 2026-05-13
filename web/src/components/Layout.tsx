@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sliders,
   Sparkles,
+  Wand2,
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
@@ -27,6 +28,7 @@ const TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/agents": "Agent Explorer",
   "/modeler": "What-If Modeler",
+  "/design": "Agent Modeller",
   "/optimisations": "Optimisations",
   "/governance": "Governance",
 };
@@ -47,6 +49,7 @@ export function Layout() {
       { to: "/", label: "Dashboard", icon: <BarChart3 size={16} />, end: true },
       { to: "/agents", label: "Agent Explorer", icon: <Bot size={16} /> },
       { to: "/modeler", label: "What-If Modeler", icon: <Sliders size={16} /> },
+      { to: "/design", label: "Agent Modeller", icon: <Wand2 size={16} /> },
       {
         to: "/optimisations",
         label: "Optimisations",

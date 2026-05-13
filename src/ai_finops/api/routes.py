@@ -770,7 +770,7 @@ def modeler_refine(
         profile_data["channel"] = Channel(profile_data["channel"])
     profile_data.pop("created_date", None)
 
-    profile = AgentProfile(**{k: v for k, v in profile_data.items() if hasattr(AgentProfile, k) or k in AgentProfile.__dataclass_fields__})
+    profile = AgentProfile(**{k: v for k, v in profile_data.items() if k in AgentProfile.__dataclass_fields__})
     usage = InteractionProfile(**{k: v for k, v in usage_data.items() if k in InteractionProfile.__dataclass_fields__})
 
     engine = _engine(request)

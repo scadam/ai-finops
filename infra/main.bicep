@@ -375,6 +375,13 @@ var roleServiceBusDataSender       = '69a216fc-b8fb-44d8-bc22-1f3c2cd27a39'
 var roleServiceBusDataReceiver     = '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0'
 var roleCostManagementReader       = '72fafb9e-0641-4937-9268-a91bfd8191a3'
 var roleKeyVaultAdministrator      = '00482a5a-887f-4fb3-b363-3b7fe8e74483'
+// Read-only RBAC required by the plug-and-play SDK pullers (Part 1).
+// Reader is enough for ARM inventory + Defender + Power Platform admin REST.
+// Microsoft Graph application permissions (Reports.Read.All, Agent.Read.All,
+// Directory.Read.All, SecurityAlert.Read.All, InformationProtectionPolicy.Read.All)
+// MUST be granted on the App Registration manually — they are not assignable
+// via Bicep. See docs/permissions.md.
+var roleReader                     = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 
 // Backend → Storage
 resource raApiStorage 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -427,6 +434,40 @@ resource raApiCostMgmt 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleCostManagementReader)
     principalId: api.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Backend → Reader at resource group scope (Azure inventory puller).
+// Customers can elevate to subscription scope manually for full visibility.
+resource raApiReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, api.id, roleReader)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleReader)
+    principalId: api.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Functions → Reader (so the scheduled ingestion fan-out can call ARM).
+resource raFuncReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, functionsApp.id, roleReader)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleReader)
+    principalId: functionsApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Functions → Cost Management Reader (scheduled FOCUS pulls).
+resource raFuncCostMgmt 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(subscription().id, functionsApp.id, roleCostManagementReader)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleCostManagementReader)
+    principalId: functionsApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
 }
