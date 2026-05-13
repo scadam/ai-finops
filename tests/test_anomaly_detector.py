@@ -71,7 +71,7 @@ def _seed_token_spike(repo: Repository) -> None:
             "cost_actual_usd": Decimal("250"),
         }
     )
-    repo.insert_cost_events(events)
+    repo.insert_cost_events(events, require_source=False)
 
 
 def test_detect_runs_all_rules(

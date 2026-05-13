@@ -60,7 +60,8 @@ def test_cost_summary_and_trends(repository: Repository) -> None:
                 "azure_service": "azure_openai",
                 "cost_actual_usd": Decimal("12.34"),
             },
-        ]
+        ],
+        require_source=False,
     )
     summary = repository.cost_summary()
     assert Decimal(summary["total_monthly_usd"]) == Decimal("3062.34")
