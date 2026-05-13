@@ -1,9 +1,22 @@
-"""Stub modules for ingestion connectors.
+"""Ingestion connectors for AI FinOps."""
+from ._http import TokenProvider, request_with_retry
+from .azure_focus_importer import REQUIRED_TAGS, FocusImporter, FocusRowAdapter
+from .azure_retail_prices import PriceDiff, RefreshResult, RetailPricesRefresher
+from .graph_credits_puller import GraphCreditsPuller
+from .graph_license_puller import GraphLicensePuller
+from .runner import IngestionResult, IngestionRunner
 
-Per copilot-instructions.md §6.1. These are deliberately stubs in this
-build — connectors should be wired up to Microsoft Graph, Azure Cost
-Management FOCUS exports, and the Agent 365 registry as a follow-up.
-
-Each module documents the required Graph/REST endpoints and the
-shape of the records to map into ``CostEvent``.
-"""
+__all__ = [
+    "REQUIRED_TAGS",
+    "FocusImporter",
+    "FocusRowAdapter",
+    "GraphCreditsPuller",
+    "GraphLicensePuller",
+    "IngestionResult",
+    "IngestionRunner",
+    "PriceDiff",
+    "RefreshResult",
+    "RetailPricesRefresher",
+    "TokenProvider",
+    "request_with_retry",
+]

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     api_audience: str = "api://ai-finops"
 
     # DB
-    database_url: str = ""
+    database_url: str = "sqlite:///./.data/ai_finops.sqlite"
 
     # Azure
     azure_subscription_id: str = ""

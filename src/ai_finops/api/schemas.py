@@ -166,3 +166,25 @@ class HealthResponse(BaseModel):
     status: str
     env: str
     rate_cards: list[dict[str, Any]]
+
+
+class BudgetIn(BaseModel):
+    name: str
+    amount_usd: Decimal | float | str
+    period: str = "monthly"
+    alert_threshold_pct: float = 80
+    scope: str = ""
+    owner: str = ""
+
+
+class BudgetOut(BaseModel):
+    id: str
+    name: str
+    amount_usd: str
+    period: str
+    alert_threshold_pct: float
+    scope: str
+    owner: str
+    consumed_usd: str
+    consumed_pct: float
+    status: str
